@@ -11,7 +11,7 @@ const io = new Server(server, {
     },
 });
 
-let users = [];
+let users = []; // Track connected users
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
@@ -23,27 +23,33 @@ io.on('connection', (socket) => {
     if (users.length >= 2) {
         const user1 = users.shift();
         const user2 = users.shift();
+
+        // Notify both users that they are paired
         io.to(user1).emit('paired', user2);
         io.to(user2).emit('paired', user1);
     }
 
     // Relay signaling messages
     socket.on('signal', (data) => {
+        console.log('Relaying signal from', socket.id, 'to', data.to);
         socket.to(data.to).emit('signal', { from: socket.id, signal: data.signal });
     });
 
-  // Handle custom disconnect event
-  socket.on('user_disconnect', () => {
-    console.log('User manually disconnected:', socket.id);
-    users = users.filter((user) => user !== socket.id);
+    // Handle custom disconnect event
+    socket.on('user_disconnect', () => {
+        console.log('User manually disconnected:', socket.id);
+        users = users.filter((user) => user !== socket.id);
+        socket.broadcast.emit('partner_disconnected'); // Notify the partner
+    });
+
+    // Handle built-in disconnect event
+    socket.on('disconnect', () => {
+        console.log('A user disconnected:', socket.id);
+        users = users.filter((user) => user !== socket.id);
+        socket.broadcast.emit('partner_disconnected'); // Notify the partner
+    });
 });
 
-// Handle built-in disconnect event
-socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
-    users = users.filter((user) => user !== socket.id);
-});
-});
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
